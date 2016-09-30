@@ -23,7 +23,14 @@ class CansimPY:
         self.cwd = os.getcwd()
         self.matrices_updated = []
         self.sessionarchive = None
-        self.Central_data = HDFStore("Central_data.h5", "r+")
+        try:
+            self.Central_data.close()
+        except:
+            pass
+        try:
+            self.Central_data = HDFStore("Central_data.h5", "r+")
+        except:
+            self.Central_data = HDFStore("Central_data.h5", "w")
         self.theuser = user
         self.status = None
         # as a string
@@ -31,16 +38,15 @@ class CansimPY:
         # so calculations can be done
         self.starttime = datetime.datetime.now()
         try:
-            self.currentlog = open('currentlog', 'w')
+            self.centrallog = open('centrallog.txt', 'r+')
         except Exception:
-            self.currentlog = None
+            self.centrallog = open('centrallog.txt','w')
             print(self.mes_dict['Sys_NA'])
         self.startlog()
         print('*** past start log in initialization')
         if setup == True:
             self.addsessionarchive()
         self.dirdict = {'thearch':'archive',
-                        'current':'most_recent',
                         'raw':'rawdump'}
     def info(self):
         """Lists diagnostic information about the session"""
@@ -52,10 +58,17 @@ class CansimPY:
     def __del__(self):
         """need to perform some cleanup at end of session as
         well as ensure that all files are closed"""
-        self.currentlog.close()
-        self.Central_data.close()
+        try:
+            self.centrallog.close()
+        except:
+            print("Could not close log file")
+        try:
+            self.Central_data.close()
+        except:
+            print("Could not close central_data")
         self.archiveloadedmatrices()
         self.archivelogfile()
+        print("*** in the delete function")
         #delete from workspace
     def __repr__(self):
         retstr = "CansimPYSession started at " + self.thedate
@@ -66,9 +79,9 @@ class CansimPY:
         self.add_to_log("Beginning of session by user %s" % self.theuser)
     def testlog(self):
         """quick check to make sure log file is open"""
-        if self.currentlog == None:
+        if self.centrallog == None:
             print("Log File not working")
-        return self.currentlog
+        return self.centrallog
     def timelapsed(self):
         """ returns time in current session in minutes"""
         retval = datetime.datetime.now() - self.starttime
@@ -87,18 +100,18 @@ class CansimPY:
         self.mes_dict['Ses_start'] = "Session has started"
         self.mes_dict['F_exists'] = "File exists"
         self.mes_dict['F_opened'] = "File opened"
-        self.mes_dict['RL_Fail'] = "Remote List Fail"
+        self.mes_dict['RL_Fail'] = "Remove List Fail"
         self.mes_dict['Ftype_Fail'] = "Wrong File Type"
         self.mes_dict['FHand_None'] = "File Handle is Null"
         self.mes_dict['RHand_None'] = "Raw File not found"
         self.mes_dict['clst_emp'] = "column list not initialized"
     def add_to_log(self, anewline):
         """this method will append a new line to the session log file"""
-        if self.currentlog == None:
+        if self.centrallog == None:
             print("Log file not open\n")
             return 'FHand_None'
-        self.currentlog.writelines(anewline)
-        self.currentlog.write("\n")
+        self.centrallog.writelines(anewline)
+        self.centrallog.write("\n")
     def is_installed(self):
         """determine if the directories have been setup in current directory"""
        #if system is installed there you should be an archive directory
@@ -121,6 +134,7 @@ class CansimPY:
                 return numdirs
             numdirs += 1
         self.add_to_log("Number of directories created %i " % numdirs)
+        print("*** Directories are built")
         return numdirs
     def addsessionarchive(self, specialtag=None):
         """ creates subdirectory in current archive directory"""
@@ -158,7 +172,23 @@ class CansimPY:
         os.chdir(self.cwd)
         return self.sessionarchive
     def removelist(self, areyousure=False):
-        """takedown all the directories"""
+        """takedown all the directories and files"""
+        try:
+            self.Central_data.close()
+        except:
+            pass
+        try:
+            self.centrallog.close()
+        except:
+            pass        
+        try:
+            os.remove('Central_data.h5')
+        except:
+            pass
+        try:
+            os.remove('centrallog.txt')
+        except:
+            pass       
         numdirs = 0
         print("*** are you sure = %s" %areyousure)
         if areyousure == False:
@@ -168,12 +198,14 @@ class CansimPY:
                 shutil.rmtree(dirstr)
                 print(dirstr)
             except Exception:
+                if numdirs == 0:
+                    return 0
                 print(self.mes_dict['RL_Fail'])
                 return numdirs
             numdirs += 1
         return numdirs
     def archiveloadedmatrices(self):
-        print("Not yet implemented")
+        print("archive load matrices Not yet implemented")
     def archivelogfile(self):
         print("Not yet implemented")
 
@@ -182,13 +214,14 @@ def setup_CansimPY(getconfirm=True,user=None):
     # python consule should be run    
     #glob is to determine if central data base is present
     #if yes then conclude 
+    print("*** just entered setup")
     testloaded = glob.glob("Central_data.h5")
+    print("*** just after glob")
     if len(testloaded) > 0:
         return 'Sys_Loaded'
-    # create file in write mode
-    f = h5py.File("Central_data.h5",'w')
-    f.close()        
+     
     # directories are not yet available
+    print("***about to creat new session")
     CansimPYSession = CansimPY(user,setup=False)
    
     if CansimPYSession.is_installed() == True:
@@ -200,37 +233,17 @@ def setup_CansimPY(getconfirm=True,user=None):
         print(theQ)
         theresp = input("->")
     if theresp.upper() != "Y":
+        print("*** theresp = %s",theresp)
         print(CansimPYSession.mes_dict['Init_Halt'])
         return 'Init_Halt'
     #if environment has already been setup prompt to continue
     #existence of 
+    print("*** in setup just before buildlist")
     CansimPYSession.builddlist()
     CansimPYSession.addsessionarchive(specialtag='Initialization')
-    
-    return CansimPYSession
- 
-def startup_CansimPY(user=None):
-    print("*** in startup 0.5")
-    
-    #if system is installed there you should be an archive directory
-    print("*** in startup 1")
-    if os.path.isdir("archive") == False:
-        print("system not installed \n")
-        return 'Sys_NA'
-    #need to check if a session has already started
-    print("*** in startup 1.5")
-    listdir = dir()
-    if 'CansimPYSession' in listdir:
-        return 'Sys_Loaded'
-    print("*** in startup 2")
-    #setup = True shows that base directories should be available
-    CansimPYSession = CansimPY(user,setup=True)
-    CansimPYSession.add_to_log( CansimPYSession.mes_dict['Ses_start'])
-    CansimPYSession.status = 'Ses_Start'
-    return CansimPYSession
-        
-
-        
+    retval = 'Sys_A'
+    print("*** at end of setup retval = %s",retval)
+    return retval        
             
 def unittest():
     # will want to use test directory for test
@@ -238,7 +251,7 @@ def unittest():
     os.chdir(os.path.dirname(os.getcwd()))
     os.chdir('test2')
     #clean up directory for each test
-    global CansimPYSession
+    CansimPYSession = CansimPY(setup = True)
     try:
         print('*** in the try remove list')
         CansimPYSession.removelist(areyousure=True)
@@ -251,44 +264,15 @@ def unittest():
     import unittest.mock as mock
     # retval = setup_CansimPY()
     # assert retval == 'Ses_Start',"retval = %s" % retval
-
-    with mock.patch('builtins.input', return_value='N'):
-        assert setup_CansimPY() == 'Init_Halt', "Did not process prompt properly"
-    with mock.patch('builtins.input', return_value='N'):
-        assert setup_CansimPY(getconfirm = True) == 'Init_Halt', "Did not process prompt properly"    
-    with mock.patch('builtins.input', return_value='N'):
-        assert setup_CansimPY(getconfirm = False) != 'Init_Halt', "Did not process prompt properly"  
+    print("*** about to go into setup")
     with mock.patch('builtins.input', return_value='Y'):
-        assert setup_CansimPY() == 'Sys_Setup', "Did not process prompt properly"  
-    # user field should be empty
-    assert CansimPYSession.theuser == None , "Did not default name"
-    #need to validate the setup procedure by the number of directories that are
-    # are taken down
-    numdir = len(CansimPYSession.dirdict)
-    # should fail
-    retval = CansimPYSession.removelist(areyousure=False)
-    assert retval == 0 , "removelist should have failed"
-    # should fail
-    retval = CansimPYSession.removelist()
-    assert retval == 0 , "removelist should have failed"
-    # should succeed
-    retval = CansimPYSession.removelist(areyousure=True)
-    assert retval == numdir , "removelist should returned %i" %numdir
-    # put the directory up and leave for inspection
-    with mock.patch('builtins.input', return_value='Y'):
-        assert setup_CansimPY(user='George') == 'Sys_Setup', "Did not process prompt properly"     
-    assert CansimPYSession.theuser == "George", "Name stored incorrectly"
-    
-    # result is unpredictable but should be very small
-    rettime = CansimPYSession.timelapsed()
-    assert rettime < 1 , "time elapsed is %s"  %str(rettime)
-    # need to close the logfile for inspection
-    CansimPYSession.currentlog.close()
+        assert setup_CansimPY() == 'Sys_A', "Did not process prompt properly"
+    print("*** just after setup")
     # then move back to directory
     # move up a directory
     os.chdir(os.path.dirname(os.getcwd()))
     os.chdir('test2')
-    
+    print("*** at end of unittest")
 if __name__ == '__main__':
     stdin = sys.stdin
     unittest()
