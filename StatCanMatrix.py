@@ -113,6 +113,9 @@ class StatCanMatrix(CansimPY.CansimPY):
         return self.col_max
     def upload(self, mattype, dateformat, vlist='All'):
         """ reads raw data and loads into dataframe"""
+        if self.SCfilehandle == None:
+            print("nothing to upload")
+            return
         if mattype == 'obs_by_row':
             self.upload_obs_by_row(dateformat, vlist)
 
@@ -206,12 +209,14 @@ class StatCanMatrix(CansimPY.CansimPY):
             print(self.info())
         os.chdir(os.path.dirname(os.getcwd()))
         if self.SCfilehandle != None:
-            self.add_to_log(self.filename)
+            logmessage = "Opened" + self.filename
+            self.add_to_log(logmessage)
             self.add_to_log(self.mes_dict['F_opened'])
             return self.SCfilehandle
         else:
-            self.add_to_log(self.filename)
-            self.add_to_log(self.mes_dict['FHand_None'])
+            logmessage = "Could not open " + self.filename
+            self.add_to_log(logmessage)
+            self.add_to_log(self.mes_dict['RHand_None'])
             return 'FHand_None'
     def determinefileorg(self):
         """will test the downloaded file to determine configuration
@@ -247,13 +252,7 @@ def unittest():
     #clean up directory for each test
 
 
-    with mock.patch('builtins.input', return_value='Y'):
-        print("*** doing setup\n""")
-        retval = CansimPY.setup_CansimPY()
-    if retval == 'Sys_A':
-        print("*** Doing startup")
-        retval2 = CansimPY.startup_CansimPY()
-        assert retval2 == 'Ses_Start', "unable to start session"
+
     # Now test the ability to create a matrix
     # This will be Matrix 282_0001 - detailed monthly labour force data
     class Matrix282_0001(StatCanMatrix):
