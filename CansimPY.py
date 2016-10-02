@@ -5,7 +5,7 @@ Created on Sun Aug 14 20:37:02 2016
 @author: lancehermes
 """
 
-import h5py
+
 import sys
 import os
 import datetime
@@ -21,6 +21,8 @@ class CansimPY:
         self.mtype_dict = self.mes_dict = {}
         self.loadmessages()
         self.cwd = os.getcwd()
+        #establish log file for the session in the working directory
+        self.ses_log = open('Session_log.txt','w')
         self.matrices_updated = []
         self.sessionarchive = None
         try:
@@ -66,6 +68,7 @@ class CansimPY:
             self.Central_data.close()
         except:
             print("Could not close central_data")
+        self.ses_log.close()
         self.archiveloadedmatrices()
         self.archivelogfile()
         print("*** in the delete function")
