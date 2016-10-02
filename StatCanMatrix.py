@@ -13,30 +13,36 @@ import timevar
 import os
 import re
 import csv
-import pprint
 from pandas import Series, DataFrame, HDFStore
 import pandas
+import math
 import unittest.mock as mock
 
 
 class StatCanMatrix(CansimPY.CansimPY):
     """object storing statscan matrix  info"""
     def  __init__(self, filename, maxvars=10000, user=None, setup=True, 
-                  matname = None,maxprob=5):
+                  matname = None, maxprobs=5):
         super().__init__(user, setup)
         self.filename = filename
         #matname is usually an integer identifying the matrix
         self.matname = matname
+        self.ses_log.write('%s is being process \n' %self.filename)
         self.SCfilehandle = None
         self.SCfilehandle = self.openSCfile()
         #this will hold a pandas data for this matrix
         self.thepandas = DataFrame()
         self.fileorgtype = None
-        self.varcount = 0
+        # Total number of varialbes in the file
+        self.varsinfile = 0
+        # Total number of variables stored on H5 file
+        self.varsused = 0
+        # Total number that is not used
+        self.varsnotused = 0
         self.obcount = 0
         self.maxvars = maxvars
         #maximum number of problems accept to use a timeseries
-        self.maxprobs = 0
+        self.maxprobs = maxprobs
         self.gen_dict = self.geo11_dict = None
         self.vlist_dict = self.mtype_dict = self.dat_type = {}
         self.fld_type_dict = self.tags_dict = {}
@@ -56,13 +62,14 @@ class StatCanMatrix(CansimPY.CansimPY):
             #create dataset not correct command
             self.Central_data[matindex] = self.thepandas
             self.flush(fsync=True)
-            print("*** after pandas load")
             return 1
         except:
             return 0
     def __del__(self):
         """do some cleanup when matrix is loaded in pandas file"""
         # load the pandas database into HDF5 file
+        self.ses_log.write("for %s %d variables were found on the file\n" %(self.filename,self.varsinfile))
+        self.ses_log.write("   %d were saved and %d were not used" %(self.varsused,self.varsnotused))
     def loadStatCandicts(self):
         """ Load Stats Can specific labels"""
         # this will increase with more data types
@@ -120,6 +127,7 @@ class StatCanMatrix(CansimPY.CansimPY):
             self.upload_obs_by_row(dateformat, vlist)
 
         self.loadinh5()
+        print("Out of %d variables %d were not loaded" %(self.varsinfile,self.varsnotused))
     def upload_obs_by_row(self, dateformat, vlist):
         """uploads the observations assuming one row per observation"""
         # thetsvar holds the data being collected
@@ -140,7 +148,6 @@ class StatCanMatrix(CansimPY.CansimPY):
         thereader = csv.reader(self.SCfilehandle)
 
         # start processing the file
-        self.varcount = 0
         self.obcount = 0
         header = True
         # need more formal limit
@@ -159,8 +166,8 @@ class StatCanMatrix(CansimPY.CansimPY):
                 # unless it changed from none
                 if lastvar != None :
                     thetsvar.save()
-                    self.varcount = self.varcount + 1
-                    if self.varcount >= maxobs:
+                    self.varsinfile += 1
+                    if self.varsinfile >= maxobs:
                         break
                 self.resetTS(theobname, linelst, thetsvar)
                 lastvar = thetsvar.vname
@@ -168,13 +175,10 @@ class StatCanMatrix(CansimPY.CansimPY):
                 # add data item
                 thetsvar.setvalue(linelst[self.obpos])
 
-        return self.varcount
+        return self.varsinfile
     def resetTS(self, thevar, linelst, thetsvar):
         """ reset the current time series"""
         thetsvar.initvariable()
-        print('*** in reset TS')
-        print('*** colmax=',self.col_max)
-        print('*** linelst=',linelst)
         for colno in range(self.col_max):
             # identify the token to process
             thetoken = linelst[colno]
@@ -190,7 +194,6 @@ class StatCanMatrix(CansimPY.CansimPY):
                 continue
             if thefield == 'VName':
                 thetsvar.setvname(thetoken)
-                print('*** process vname = the field',thetoken)
                 continue
             if thefield == 'datum':
                 thetsvar.setvalue(thetoken)
@@ -277,6 +280,19 @@ def unittest():
     this126 = Matrix1260001("01260001-eng_2016_sept_25.csv",1260001)
     # to the actual upload
     this126.upload()
+    # will test accuracy of data uploaded
+    # note that this may need to be updated from time to time if the
+    # data itself changes
+    MYstore = HDFStore('Central_data.h5','r+')
+    themat2 = MYstore.select('Matrix1260001')
+    # check the very first observation of the first variable in the CSV file
+    theval = themat2.v17953['1985-01']
+    print(theval)
+    assert math.isclose(theval,8670.5),"v17193 not loaded properly"
+    # check the last observation of the last variable
+    theval = themat2.v18128['2016-02']
+    print(theval)
+    assert math.isclose(theval,33.9),"v18128 not loaded properly"
     # then move back to directory
     # move up a directory
 
@@ -286,7 +302,6 @@ def printtest():
     """load up database and print some values out"""
     import pprint
     from pandas import Series, DataFrame, HDFStore
-    import pandas
     MYstore = HDFStore('Central_data.h5','r+')
     print(MYstore)
     # themat = MYstore.select('Matrix2820001')
