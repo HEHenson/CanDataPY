@@ -45,8 +45,6 @@ class CansimTS:
     def setdate(self, thetoken):
         """ will split the token acc"""
         datetoklist = thetoken.split('/')
-        print("*** in setdate the token = ", thetoken)
-        print("*** the freq set to= ", self.freq)
         if self.freq == 'M':
             self.setcuryr(datetoklist[0])
             self.setcurmon(datetoklist[1])
@@ -58,6 +56,7 @@ class CansimTS:
         except ValueError:
             if thetoken in ['..','x','...']:
                 newval = numpy.nan
+                self.varprobs += 1
             else:
                 print("invalid token in setvalue",thetoken)
                 self.usevar = False
@@ -99,10 +98,16 @@ class CansimTS:
         # merge series on the dataframe
         # first create new series
         # range is the first step
+        if self.varprobs > self.thematrix.maxprobs:
+            self.thematrix.ses_log.write("%s not used due to too many NaNs \n" %self.vname)
+            self.thematrix.ses_log.flush()
+            self.thematrix.varsnotused += 1
+            return
         therng = pandas.date_range(self.datstr, periods=self.obs, freq=self.freq)
         thenew = Series(self.values, index=therng, name=self.vname)
         self.thematrix.thepandas[self.vname] = thenew
-        print("*** justadded the new \n\r", self.thematrix.thepandas)
+        self.thematrix.varsused += 1
+        
         
 # UNIT TESTS
 if  __name__ == '__main__':
