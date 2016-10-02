@@ -4,4 +4,4 @@ This is an Alpha Version of a system under development.  It is intended to be a 
 - Development of a logging system to perform diagnostics on each download
 - Install the archival system that is mentioned in the documentation
 - Improve the CSV import function so that less data is missed.
-- More options will be added to CSV import.  Currently only downloads by rows are supported.
+- More options will be added to CSV import.  Currently only downloads by rows for monthly data are supported.
