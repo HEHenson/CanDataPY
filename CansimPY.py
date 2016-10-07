@@ -15,14 +15,14 @@ from pandas import DataFrame, HDFStore
 
 
 
-class CansimPY:
+class CansimPY(object):
     def  __init__(self, user=None, setup=True):
         #initial dictionaires
         self.mtype_dict = self.mes_dict = {}
         self.loadmessages()
         self.cwd = os.getcwd()
         #establish log file for the session in the working directory
-        self.ses_log = open('Session_log.txt','w')
+        self.ses_log = open('Session_log.txt', 'w')
         self.matrices_updated = []
         self.sessionarchive = None
         try:
@@ -42,8 +42,8 @@ class CansimPY:
         try:
             self.centrallog = open('centrallog.txt', 'r+')
         except Exception:
-            self.centrallog = open('centrallog.txt','w')
-            print(self.mes_dict['Sys_NA'])
+            self.centrallog = open('centrallog.txt', 'w')
+            print(self.mes_dict[u'Sys_NA'])
         self.startlog()
         print('*** past start log in initialization')
         if setup == True:
@@ -183,7 +183,7 @@ class CansimPY:
         try:
             self.centrallog.close()
         except:
-            pass        
+            pass    
         try:
             os.remove('Central_data.h5')
         except:
@@ -191,7 +191,7 @@ class CansimPY:
         try:
             os.remove('centrallog.txt')
         except:
-            pass       
+            pass 
         numdirs = 0
         print("*** are you sure = %s" %areyousure)
         if areyousure == False:
@@ -212,20 +212,19 @@ class CansimPY:
     def archivelogfile(self):
         print("Not yet implemented")
 
-def setup_CansimPY(getconfirm=True,user=None):
+def setup_CansimPY(getconfirm=True, user=None):
     """setup directories"""
-    # python consule should be run    
+    # python consule should be run
     #glob is to determine if central data base is present
-    #if yes then conclude 
+    #if yes then conclude
     print("*** just entered setup")
     testloaded = glob.glob("Central_data.h5")
     print("*** just after glob")
     if len(testloaded) > 0:
-        return 'Sys_Loaded'
-     
+        return 'Sys_Loaded'     
     # directories are not yet available
     print("***about to creat new session")
-    CansimPYSession = CansimPY(user,setup=False)
+    CansimPYSession = CansimPY(user, setup=False)
    
     if CansimPYSession.is_installed() == True:
         print(CansimPYSession.mes_dict['Sys_A'])
@@ -236,16 +235,16 @@ def setup_CansimPY(getconfirm=True,user=None):
         print(theQ)
         theresp = input("->")
     if theresp.upper() != "Y":
-        print("*** theresp = %s",theresp)
+        print("*** theresp = %s", theresp)
         print(CansimPYSession.mes_dict['Init_Halt'])
         return 'Init_Halt'
     #if environment has already been setup prompt to continue
-    #existence of 
+    #existence of
     print("*** in setup just before buildlist")
     CansimPYSession.builddlist()
     CansimPYSession.addsessionarchive(specialtag='Initialization')
     retval = 'Sys_A'
-    print("*** at end of setup retval = %s",retval)
+    print("*** at end of setup retval = %s", retval)
     return retval        
             
 def unittest():
@@ -254,7 +253,7 @@ def unittest():
     os.chdir(os.path.dirname(os.getcwd()))
     os.chdir('test2')
     #clean up directory for each test
-    CansimPYSession = CansimPY(setup = True)
+    CansimPYSession = CansimPY(setup=True)
     try:
         print('*** in the try remove list')
         CansimPYSession.removelist(areyousure=True)
@@ -282,5 +281,4 @@ if __name__ == '__main__':
     # if assert bombs may messup consule
     sys.stdin = stdin
     print("Unit Test was successfull\n")
-    
        

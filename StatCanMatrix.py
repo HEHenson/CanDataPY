@@ -21,8 +21,8 @@ import unittest.mock as mock
 
 class StatCanMatrix(CansimPY.CansimPY):
     """object storing statscan matrix  info"""
-    def  __init__(self, filename, maxvars=10000, user=None, setup=True, 
-                  matname = None, maxprobs=5):
+    def  __init__(self, filename, maxvars=10000, user=None, setup=True,
+                  matname=None, maxprobs=5):
         super().__init__(user, setup)
         self.filename = filename
         #matname is usually an integer identifying the matrix
@@ -57,8 +57,8 @@ class StatCanMatrix(CansimPY.CansimPY):
         else:
             matindex = 'Matrix' + str(self.matname)
         try:
-            print("*** matindex=",matindex)
-            print("*** in StatCanMatrix loadinh5",self.Central_data)
+            print("*** matindex=", matindex)
+            print("*** in StatCanMatrix loadinh5", self.Central_data)
             #create dataset not correct command
             self.Central_data[matindex] = self.thepandas
             self.flush(fsync=True)
@@ -79,7 +79,7 @@ class StatCanMatrix(CansimPY.CansimPY):
         # virtually all stats Can data is one of three
         self.dat_type['monthly'] = "M"
         self.dat_type['quarterly'] = "Quarterly"
-        self.dat_type['annual'] = "Annual"
+        self.dat_type['Calendar Year'] = "AS-JAN"
         # there are a few exceptions
         # covers irregular surveys
         self.dat_type['cross'] = "Cross Section"
@@ -293,11 +293,64 @@ def unittest():
     theval = themat2.v18128['2016-02']
     print(theval)
     assert math.isclose(theval,33.9),"v18128 not loaded properly"
+    # Now test annual data
+    class Matrix2820004(StatCanMatrix):
+        def __init__(self, thefile, thename="126"):
+            super(Matrix2820004, self).__init__(thefile, 7000,matname=thename)
+            # these are valid keys
+            self.setcollist(['date', 'NA' , 'NA', 'NA','gender','NA','VName', 'NA', 'datum'])
+        def upload(self):
+            super(Matrix2820004, self).upload('obs_by_row', 'AS-JAN', 'all')
+    # create an instance of it
+    this2820004 = Matrix2820004("02820004-eng_2016_Oct_05.csv",2820004)
+    # to the actual upload
+    this2820004.upload()
+    # will test accuracy of data uploaded
+    # note that this may need to be updated from time to time if the
+    # data itself changes
+    MYstore = HDFStore('Central_data.h5','r+')
+    themat3 = MYstore.select('Matrix2820004')
+    # check the very first observation of the first variable in the CSV file
+    theval = themat3.v2582391['1990']
+    print(theval)
+    assert math.isclose(theval,21214.7),"v2582391 not loaded properly"
+    # check the last observation of the last variable
+    theval = themat3.v2587870['2015']
+    print(theval)
+    assert math.isclose(theval,48.0),"v2609119 not loaded properly"
+    # Now test quarterly data
+    class Matrix3800085(StatCanMatrix):
+        def __init__(self, thefile, thename="3800085"):
+            super(Matrix3800085, self).__init__(thefile, 7000,matname=thename)
+            # these are valid keys
+            self.setcollist(['date', 'NA' , 'NA', 'NA','NA','VName', 'NA', 'datum'])
+        def upload(self):
+            super(Matrix3800085, self).upload('obs_by_row', 'Q-MAR', 'all')
+    # create an instance of it
+    this3800085 = Matrix3800085("03800085-eng_2016_Oct_05.csv",3800085)
+    # to the actual upload
+    this3800085.upload()
+    # will test accuracy of data uploaded
+    # note that this may need to be updated from time to time if the
+    # data itself changes
+    MYstore = HDFStore('Central_data.h5','r+')
+    themat4 = MYstore.select('Matrix3800085')
+    # check the very first observation of the first variable in the CSV file
+    theval = themat4.v62700456['1981-3']
+    print(theval)
+    assert math.isclose(theval,45571),"v62700456 not loaded properly"
+    # check the last observation of the last variable
+    theval = themat4.v62700930['2016-06']
+    print(theval)
+    assert math.isclose(theval,1598),"v62700930 not loaded properly"
+
+
     # then move back to directory
     # move up a directory
 
     os.chdir(os.path.dirname(os.getcwd()))
     os.chdir('test2')
+
 def printtest():
     """load up database and print some values out"""
     import pprint
@@ -306,16 +359,14 @@ def printtest():
     print(MYstore)
     # themat = MYstore.select('Matrix2820001')
     # pprint.pprint(thevar)
-    themat2 = MYstore.select('Matrix1260001')
+    themat2 = MYstore.select('Matrix3800085')
     print(themat2)
-    r19891990 = pandas.period_range('1/1989','12/1993',freq='M')
-    thevar3 = Series(themat2.v17981,index = r19891990)
-    print(thevar3)
-    # V18128 is the last variable is CSV file
-    thevar4 = Series(themat2.v18128,index = r19891990)
-    print(thevar4)
+    #therange = pandas.period_range('1989-1','1993-3',freq='Q-MAR')
+    #thevar3 = Series(themat2.v62700456,index = therange)
+    #print(thevar3)     
     MYstore.close()
     return themat2
+
 
 
 if __name__ == '__main__':

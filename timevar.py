@@ -7,14 +7,15 @@ Created on Wed Jun  8 18:38:48 2016
 import unittest.mock as mock
 from pandas import Series
 import pandas
-import StatCanMatrix as StatCanMatrix
 import numpy
 from numpy import nan as NA
+import StatCanMatrix as StatCanMatrix
 
 
 
 
-class CansimTS:
+
+class CansimTS(object):
     """This will be the data class to collate data on an
     individual time series before outputing to pandas"""
     def __init__(self, thematrix=None, thedattype=None):
@@ -49,16 +50,25 @@ class CansimTS:
             self.setcuryr(datetoklist[0])
             self.setcurmon(datetoklist[1])
             self.datstr = thetoken
+            return
+        if self.freq == 'AS-JAN':
+            self.setcuryr(datetoklist[0])
+            self.datstr = thetoken
+            return
+        if self.freq == 'Q-MAR':
+            self.setcuryr(datetoklist[0])
+            self.setcurmon(datetoklist[1])
+            self.datstr = thetoken
+            return
     def setvalue(self, thetoken):
         """add a new observed value"""
         try:
             newval = float(thetoken)
         except ValueError:
-            if thetoken in ['..','x','...']:
+            if thetoken in ['..', 'x', '...']:
                 newval = numpy.nan
                 self.varprobs += 1
             else:
-                print("invalid token in setvalue",thetoken)
                 self.usevar = False
                 newval = NA
                 # will add log at a later date
@@ -103,27 +113,32 @@ class CansimTS:
             self.thematrix.ses_log.flush()
             self.thematrix.varsnotused += 1
             return
-        therng = pandas.date_range(self.datstr, periods=self.obs, freq=self.freq)
+        try:
+            therng = pandas.date_range(self.datstr, periods=self.obs, freq=self.freq)
+        except:
+            print("insave",self.datstr)
+            print(self.vname)
         thenew = Series(self.values, index=therng, name=self.vname)
         self.thematrix.thepandas[self.vname] = thenew
         self.thematrix.varsused += 1
-        
-        
 # UNIT TESTS
+        
+
+
 if  __name__ == '__main__':
     # testmat = StatsCanMatrix("fjkdfjak")
 
-    class Matrix282_0001(StatCanMatrix.StatCanMatrix):
+    class Matrix2820001(StatCanMatrix.StatCanMatrix):
         """ Labour Force Survey Annual Averages"""
         def __init__(self, thefile):
             super().__init__(thefile)
             # these are valid keys
             self.setcollist(['date', 'NA', 'NA', 'gender', 'NA', 'VName', 'NA', 'datum'])
         def upload(self):
-            super(Matrix282_0001, self).upload('obs_by_row', 'M', 'first5')
+            super(Matrix2820001, self).upload('obs_by_row', 'M', 'first5')
 
-    This282 = Matrix282_0001("02820001-eng.csv")
-    This282.upload()
-    assert This282.SCfilehandle != None, "statcan  matrix not found"
-    Retval = This282.istypeoneobperrow()
-    assert  Retval is True, "wrong file type"
+    THIS282 = Matrix2820001("02820001-eng.csv")
+    THIS282.upload()
+    assert THIS282.SCfilehandle != None, "statcan  matrix not found"
+    RETVAL = THIS282.istypeoneobperrow()
+    assert  RETVAL is True, "wrong file type"
