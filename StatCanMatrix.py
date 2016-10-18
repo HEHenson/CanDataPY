@@ -21,13 +21,17 @@ import unittest.mock as mock
 
 class StatCanMatrix(CansimPY.CansimPY):
     """object storing statscan matrix  info"""
-    def  __init__(self, filename, maxvars=10000, user=None, setup=True,
-                  matname=None, maxprobs=5):
+    def  __init__(self, filename=None, maxvars=10000, user=None, setup=True,
+                  matname=None, maxprobs=90):
         super().__init__(user, setup)
         self.filename = filename
         #matname is usually an integer identifying the matrix
         self.matname = matname
         self.ses_log.write('%s is being process \n' %self.filename)
+        self.matdump = True
+        if self.matdump:
+            self.matdumphdl = open("matdump.txt","w")
+            self.matdumphdl.write("detailed issues for %s\n" %self.matname)
         self.SCfilehandle = None
         self.SCfilehandle = self.openSCfile()
         #this will hold a pandas data for this matrix
@@ -70,6 +74,9 @@ class StatCanMatrix(CansimPY.CansimPY):
         # load the pandas database into HDF5 file
         self.ses_log.write("for %s %d variables were found on the file\n" %(self.filename,self.varsinfile))
         self.ses_log.write("   %d were saved and %d were not used" %(self.varsused,self.varsnotused))
+        self.SCfilehandle.close()
+        if self.matdump == True:
+            self.matdumphdl.close()
     def loadStatCandicts(self):
         """ Load Stats Can specific labels"""
         # this will increase with more data types
@@ -259,16 +266,17 @@ def unittest():
     # Now test the ability to create a matrix
     # This will be Matrix 282_0001 - detailed monthly labour force data
     class Matrix282_0001(StatCanMatrix):
-        def __init__(self, thefile, thename="282"):
-            super(Matrix282_0001, self).__init__(thefile, 7000,matname=thename)
+        def __init__(self, filename=None, maxvar=7000,matname=None):
+            super(Matrix282_0001, self).__init__(filename, maxvar,matname)
             # these are valid keys
             self.setcollist(['date', 'NA', 'NA', 'gender', 'NA', 'VName', 'NA', 'datum'])
         def upload(self):
             super(Matrix282_0001, self).upload('obs_by_row', 'M', 'first5')
     # create an instance of it
-    this282 = Matrix282_0001("02820001-eng.csv",2820001)
+    this282 = Matrix282_0001(filename= "02820001-eng.csv", matname=2820001)
     # to the actual upload
     this282.upload()
+    
     class Matrix1260001(StatCanMatrix):
         def __init__(self, thefile, thename="126"):
             super(Matrix1260001, self).__init__(thefile, 7000,matname=thename)
@@ -287,16 +295,39 @@ def unittest():
     themat2 = MYstore.select('Matrix1260001')
     # check the very first observation of the first variable in the CSV file
     theval = themat2.v17953['1985-01']
-    print(theval)
     assert math.isclose(theval,8670.5),"v17193 not loaded properly"
     # check the last observation of the last variable
     theval = themat2.v18128['2016-02']
-    print(theval)
     assert math.isclose(theval,33.9),"v18128 not loaded properly"
+    # check a variable with many NANs
+    # check only valid for a high number of variables
+    if(this126.maxprobs>35):
+        theval = themat2.v18007['2013-02']
+        assert math.isclose(theval,244.5),"v18007 not loaded properly" 
+        theval = themat2.v18007['2013-03']
+        assert math.isnan(theval),"v18007 not loaded properly" 
+        theval = themat2.v18007['2016-02']
+        assert math.isnan(theval),"v18007 not loaded properly" 
+    if(this126.maxprobs>25):
+        # data for v18006 is the same as v18007
+        theval = themat2.v18006['2013-02']
+        assert math.isclose(theval,244.5),"v18006 not loaded properly" 
+        theval = themat2.v18006['2013-03']
+        assert math.isnan(theval),"v18006 not loaded properly" 
+        theval = themat2.v18006['2016-02']
+        assert math.isnan(theval),"v18006 not loaded properly"   
+    if(this126.maxprobs>25):
+        theval2 = themat2.v18109['2013-02']
+        assert math.isclose(theval2,54),"v18109 not loaded properly retval=%f" %theval2 
+        theval = themat2.v18109['2013-03']
+        assert math.isnan(theval),"v18109 not loaded properly" 
+        theval = themat2.v18109['2016-02']
+        assert math.isnan(theval),"v18109 not loaded properly"    
+    
     # Now test annual data
     class Matrix2820004(StatCanMatrix):
         def __init__(self, thefile, thename="126"):
-            super(Matrix2820004, self).__init__(thefile, 7000,matname=thename)
+            super(Matrix2820004, self).__init__(filename=thefile, maxvars=7000,matname=thename)
             # these are valid keys
             self.setcollist(['date', 'NA' , 'NA', 'NA','gender','NA','VName', 'NA', 'datum'])
         def upload(self):
@@ -343,7 +374,7 @@ def unittest():
     theval = themat4.v62700930['2016-06']
     print(theval)
     assert math.isclose(theval,1598),"v62700930 not loaded properly"
-
+    
 
     # then move back to directory
     # move up a directory
