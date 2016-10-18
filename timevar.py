@@ -70,6 +70,8 @@ class CansimTS(object):
                 self.varprobs += 1
             else:
                 self.usevar = False
+                if matdump:
+                    self.thematrix.matdumphdl.write("the token %s prevented the use of %s /n" %(thetoken,self.vname))
                 newval = NA
                 # will add log at a later date
         self.values.append(newval)
@@ -110,6 +112,8 @@ class CansimTS(object):
         # range is the first step
         if self.varprobs > self.thematrix.maxprobs:
             self.thematrix.ses_log.write("%s not used due to too many NaNs \n" %self.vname)
+            if self.thematrix.matdump:
+                self.thematrix.matdumphdl.write("%s had %d problems \n" %(self.vname,self.varprobs)) 
             self.thematrix.ses_log.flush()
             self.thematrix.varsnotused += 1
             return
