@@ -30,6 +30,10 @@ class CansimPY(object):
         except:
             pass
         try:
+            try:
+                self.Central_data.close()
+            except:
+                pass
             self.Central_data = HDFStore("Central_data.h5", "r+")
         except:
             self.Central_data = HDFStore("Central_data.h5", "w")
@@ -45,7 +49,6 @@ class CansimPY(object):
             self.centrallog = open('centrallog.txt', 'w')
             print(self.mes_dict[u'Sys_NA'])
         self.startlog()
-        print('*** past start log in initialization')
         if setup == True:
             self.addsessionarchive()
         self.dirdict = {'thearch':'archive',
@@ -78,7 +81,6 @@ class CansimPY(object):
         return retstr
     def startlog(self):
         """initialize the log file"""
-        print("*** at startlog %s" % self.theuser)
         self.add_to_log("Beginning of session by user %s" % self.theuser)
     def testlog(self):
         """quick check to make sure log file is open"""
@@ -147,7 +149,7 @@ class CansimPY(object):
         print(self.thedate)
         subdir = "session" + self.thedate
         if self.theuser != None:
-            subdir = subdir + self.theuser
+            subdir = subdir + str(self.theuser)
         # may be more than one by None that data
         else:
             subdir = subdir + "anon" + datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
