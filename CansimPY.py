@@ -16,50 +16,50 @@ from pandas import DataFrame, HDFStore
 
 
 class CansimPY(object):
-    def  __init__(self, user=None, setup=True):
+    def  __init__(self, user=None, setupalready=True):
         #initial dictionaires
         self.mtype_dict = self.mes_dict = {}
+        self.dirdict = {'thearch':'archive',
+                        'raw':'rawdump'}
+        self.matrices_updated = []
+        self.sessionarchive = None
         self.loadmessages()
         self.cwd = os.getcwd()
         #establish log file for the session in the working directory
         self.ses_log = open('Session_log.txt', 'w')
-        self.matrices_updated = []
-        self.sessionarchive = None
-        try:
-            self.Central_data.close()
-        except:
-            pass
-        try:
-            try:
-                self.Central_data.close()
-            except:
-                pass
-            self.Central_data = HDFStore("Central_data.h5", "r+")
-        except:
-            self.Central_data = HDFStore("Central_data.h5", "w")
-        self.theuser = user
-        self.status = None
         # as a string
         self.thedate = "{:%B_%d_%Y}".format(datetime.datetime.now())
         # so calculations can be done
         self.starttime = datetime.datetime.now()
+        self.theuser = user
+        self.status = None
+        if not setupalready:
+            return
+
+        # everything after this point on will be executed once    
         try:
-            self.centrallog = open('centrallog.txt', 'r+')
+            self.centrallog = open('centrallog.txt', 'r+')    
         except Exception:
             self.centrallog = open('centrallog.txt', 'w')
-            print(self.mes_dict[u'Sys_NA'])
-        self.startlog()
-        if setup == True:
-            self.addsessionarchive()
-        self.dirdict = {'thearch':'archive',
-                        'raw':'rawdump'}
+        self.startlog()    
+        try:
+            try:
+                self.Central_data.close()
+                print("*** Tried to close file")
+            except:
+                print("*** file did not close")
+            self.Central_data = HDFStore("Central_data.h5", "r+")
+        except:
+            self.Central_data = HDFStore("Central_data.h5", "w")
+
+
     def info(self):
         """Lists diagnostic information about the session"""
         retstr = "Session started at hour " + str(self.starttime.hour)
         retstr = retstr + " minute " + str(self.starttime.minute)
         print(retstr)
         retstr = "The current working directory is " + self.cwd
-        print(retstr)
+        print(retstr)        
     def __del__(self):
         """need to perform some cleanup at end of session as
         well as ensure that all files are closed"""
@@ -110,6 +110,8 @@ class CansimPY(object):
         self.mes_dict['FHand_None'] = "File Handle is Null"
         self.mes_dict['RHand_None'] = "Raw File not found"
         self.mes_dict['clst_emp'] = "column list not initialized"
+        self.mes_dict['Inv_Lst'] = "Invalid List"
+        self.mes_dict['Inv_Vnum'] = "Invalid Vnumber %s"
     def add_to_log(self, anewline):
         """this method will append a new line to the session log file"""
         if self.centrallog == None:
@@ -120,10 +122,22 @@ class CansimPY(object):
     def is_installed(self):
         """determine if the directories have been setup in current directory"""
        #if system is installed there you should be an archive directory
+        if os.path.isdir("rawdump") == False:
+            print("rawdump not found")
+            return False
         if os.path.isdir("archive") == False:
-            return 'Sys_NA'
-        else:
-            return 'Sys_A'
+            print("archive not found")
+            return False
+        if os.path.isfile("Central_data.h5") == False:
+            print("Central_data.h5 not found")
+            return False
+        """
+        Central log.txt does not appear to be used anywhere
+        if os.path.isfile("Central_log.txt") == False:
+            print("Central_log.txt not found")
+            return False        
+        """
+        return True
     def builddlist(self):
         """add the directory list for the session"""
         # assume that the current working directory is still
@@ -138,7 +152,7 @@ class CansimPY(object):
             except Exception:
                 return numdirs
             numdirs += 1
-        self.add_to_log("Number of directories created %i " % numdirs)
+
         print("*** Directories are built")
         return numdirs
     def addsessionarchive(self, specialtag=None):
@@ -214,19 +228,11 @@ class CansimPY(object):
     def archivelogfile(self):
         print("Not yet implemented")
 
-def setup_CansimPY(getconfirm=True, user=None):
+def setup_CanData(getconfirm=True, user=None):
     """setup directories"""
     # python consule should be run
-    #glob is to determine if central data base is present
-    #if yes then conclude
-    print("*** just entered setup")
-    testloaded = glob.glob("Central_data.h5")
-    print("*** just after glob")
-    if len(testloaded) > 0:
-        return 'Sys_Loaded'     
-    # directories are not yet available
-    print("***about to creat new session")
-    CansimPYSession = CansimPY(user, setup=False)
+
+    CansimPYSession = CansimPY(user, setupalready=False)
    
     if CansimPYSession.is_installed() == True:
         print(CansimPYSession.mes_dict['Sys_A'])
@@ -255,7 +261,9 @@ def unittest():
     os.chdir(os.path.dirname(os.getcwd()))
     os.chdir('test2')
     #clean up directory for each test
-    CansimPYSession = CansimPY(setup=True)
+    # does not matter if the system is setup
+    # this response allows access to methods
+    CansimPYSession = CansimPY(setupalready=False)
     try:
         print('*** in the try remove list')
         CansimPYSession.removelist(areyousure=True)
@@ -270,7 +278,7 @@ def unittest():
     # assert retval == 'Ses_Start',"retval = %s" % retval
     print("*** about to go into setup")
     with mock.patch('builtins.input', return_value='Y'):
-        assert setup_CansimPY() == 'Sys_A', "Did not process prompt properly"
+        assert setup_CanData() == 'Sys_A', "Did not process prompt properly"
     print("*** just after setup")
     # then move back to directory
     # move up a directory
@@ -283,4 +291,5 @@ if __name__ == '__main__':
     # if assert bombs may messup consule
     sys.stdin = stdin
     print("Unit Test was successfull\n")
+    print("Remember to reload raw files")
        

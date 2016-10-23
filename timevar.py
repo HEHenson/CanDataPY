@@ -70,7 +70,7 @@ class CansimTS(object):
                 self.varprobs += 1
             else:
                 self.usevar = False
-                if matdump:
+                if self.matdump:
                     self.thematrix.matdumphdl.write("the token %s prevented the use of %s /n" %(thetoken,self.vname))
                 newval = NA
                 # will add log at a later date
@@ -117,6 +117,26 @@ class CansimTS(object):
             self.thematrix.ses_log.flush()
             self.thematrix.varsnotused += 1
             return
+        # determine if there is a list based reason to exclude variable
+        # first test if there is a list of individual variables to be included
+        if self.thematrix.inclist is not None:
+            if self.vname not in self.thematrix.inclist:
+                return
+        # second test if it is outside the minimum and maximum
+        stayin = False
+        if self.thematrix.exrng is not None:
+            if self.vname < self.thematrix.exrng[0] or self.vname > self.thematrix.exrng[1]:
+                print("scored a true on exrng with %s" %self.vname)
+                stayin = True
+            if not stayin:
+                return
+        # third test if withing inclusion range
+        if self.thematrix.incrng is not None:
+            if self.vname < self.thematrix.incrng[0]:
+                return
+            if self.vname > self.thematrix.incrng[1]:
+                return
+                
         try:
             therng = pandas.date_range(self.datstr, periods=self.obs, freq=self.freq)
         except:

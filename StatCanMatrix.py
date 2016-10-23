@@ -17,6 +17,7 @@ from pandas import Series, DataFrame, HDFStore
 import pandas
 import math
 import unittest.mock as mock
+import copy
 
 
 class StatCanMatrix(CansimPY.CansimPY):
@@ -54,6 +55,65 @@ class StatCanMatrix(CansimPY.CansimPY):
         # mat_type describes the formats downloaded from stats Can
         self.loadStatCandicts()
         self.loadstandardtags()
+        # initialize lists for input
+        self.retrng = self.exrng = self.incrng = self.inclist = None
+    def set_exrng(self,vnums):
+        """two vnumbers that define range to be excluded"""
+        retrng = self.set_rng2(vnums)
+        self.exrng = copy.deepcopy(retrng)
+    def set_incrng(self,vnums):
+        """ restrict vnumbers to the minumum and maximum"""
+        retrng = self.set_rng2(vnums)
+        self.incrng = copy.deepcopy(retrng)
+    def set_rng2(self,vnums):
+        self.retrng = []
+        if type(vnums) is not list:
+            print(self.mes_dict['Inv_Lst'])
+            return 'Inv_Lst'
+        if len(vnums) !=2:
+            print(self.mes_dict['Inv_Lst'])
+            return 'Inv_Lst'
+        retval = 0
+        for vobj in vnums:
+            if not self.isvnum(vobj):
+                print(self.mes_dict['Inv_Vnum'] %vobj)
+                continue
+            self.retrng.append(vobj)
+            retval += 1
+        return self.retrng
+    def set_inclist(self,vnums):
+        """ list of individual v numbers to be included"""
+        self.inclist = []
+        if type(vnums) is not list:
+            print(self.mes_dict['Inv_Lst'])
+            return 'Inv_Lst'
+        # need to check that each entry is a string
+        retval = 0
+        for vobj in vnums:
+            if not self.isvnum(vobj):
+                print(self.mes_dict['Inv_Vnum'] %vobj)
+                continue
+            self.inclist.append(vobj)
+            retval += 1
+        return retval
+        
+    def isvnum(self,vobj):
+        """ Boolean function to validate if string appears to look like
+        vnumber"""
+        if vobj is not str:
+            return 'Inv_Vnum'
+        if vobj[0] is not 'v':
+            return 'Inv_Vnum'
+        # not sure what the maximum length is at this point but will assume
+        # 3o for now
+        if len(vobj) < 30:
+            return 'Inv_Vnum'
+        # check to make sure that the rest of the digit is a number
+        if not vobj[1:].isdigit():
+            return 'Inv_Vnum'
+        
+        
+        
     def loadinh5(self):
         """ load recently created dataframe into h5 file"""
         if self.matname == None:
@@ -74,7 +134,8 @@ class StatCanMatrix(CansimPY.CansimPY):
         # load the pandas database into HDF5 file
         self.ses_log.write("for %s %d variables were found on the file\n" %(self.filename,self.varsinfile))
         self.ses_log.write("   %d were saved and %d were not used" %(self.varsused,self.varsnotused))
-        self.SCfilehandle.close()
+        if self.SCfilehandle != None:
+            self.SCfilehandle.close()
         if self.matdump == True:
             self.matdumphdl.close()
     def loadStatCandicts(self):
@@ -127,6 +188,10 @@ class StatCanMatrix(CansimPY.CansimPY):
         return self.col_max
     def upload(self, mattype, dateformat, vlist='All'):
         """ reads raw data and loads into dataframe"""
+        retval = self.is_installed()
+        if retval == False:
+            print(self.mes_dict['SYS_NA'])
+            return 'SYS_NA'
         if self.SCfilehandle == None:
             print("nothing to upload")
             return
@@ -181,6 +246,8 @@ class StatCanMatrix(CansimPY.CansimPY):
             else:
                 # add data item
                 thetsvar.setvalue(linelst[self.obpos])
+        # note that loop will abort without saving the last variable
+        thetsvar.save()
 
         return self.varsinfile
     def resetTS(self, thevar, linelst, thetsvar):
@@ -292,6 +359,7 @@ def unittest():
     # note that this may need to be updated from time to time if the
     # data itself changes
     MYstore = HDFStore('Central_data.h5','r+')
+    MYstore
     themat2 = MYstore.select('Matrix1260001')
     # check the very first observation of the first variable in the CSV file
     theval = themat2.v17953['1985-01']
@@ -374,8 +442,90 @@ def unittest():
     theval = themat4.v62700930['2016-06']
     print(theval)
     assert math.isclose(theval,1598),"v62700930 not loaded properly"
-    
+    # Now test single retrieval on annual data
+    class Matrix1530114(StatCanMatrix):
+        def __init__(self, thefile, thename="126"):
+            super(Matrix1530114, self).__init__(filename=thefile, maxvars=7000,matname=thename)
+            # these are valid keys
+            self.setcollist(['date', 'NA' , 'NA', 'VName', 'NA', 'datum'])
+        def upload(self):
+            super(Matrix1530114, self).upload('obs_by_row', 'AS-JAN', 'all')
+    # create an instance of it
+    this1530114 = Matrix1530114("01530114-eng.csv", 1530114)
+    # to the actual upload
+    this1530114.set_inclist(['v79874995'])
+    print("*** inclist is ",this1530114.inclist)
+    this1530114.upload()
+    # will test accuracy of data uploaded
+    # note that this may need to be updated from time to time if the
+    # data itself changes
+    MYstore = HDFStore('Central_data.h5','r+')
+    themat5 = MYstore.select('Matrix1530114')
+    # check the very first observation of the first variable in the CSV file
+    theval = themat5.v79874995['2009']
+    print(theval)
+    assert math.isclose(theval,721165),"v79874995 not loaded properly"
+    # check the last observation of the first variable
+    theval = themat5.v79874995['2014']
+    print(theval)
+    assert math.isclose(theval,768238),"v79874995 not loaded properly"
+    # This will test the include in range option
+    # It will also test doing a second retrieval off the same csv file  
+    this1530114 = Matrix1530114("01530114-eng.csv", 1530114)
+    # to the actual upload
+    this1530114.set_incrng(['v79874995','v79874998'])
+    print("*** exclussion list is ",this1530114.incrng)
+    this1530114.upload()
+    # will test accuracy of data uploaded
+    # note that this may need to be updated from time to time if the
+    # data itself changes
+    MYstore = HDFStore('Central_data.h5','r+')
+    themat6 = MYstore.select('Matrix1530114')
+    # check the very first observation of the first variable in the CSV file
+    theval = themat6.v79874995['2009']
+    print(theval)
+    assert math.isclose(theval,721165),"v79874995 not loaded properly"
+    # check the last observation of the first variable
+    theval = themat6.v79874995['2014']
+    print(theval)
+    assert math.isclose(theval,768238),"v79874995 not loaded properly"
+     # check the very first observation of the first variable in the CSV file
+    theval = themat6.v79874998['2009']
+    print(theval)
+    assert math.isclose(theval,8418),"v79874998 not loaded properly"
+    # check the last observation of the first variable
+    theval = themat6.v79874998['2014']
+    print(theval)
+    assert math.isclose(theval,8747),"v79874998 not loaded properly"   
 
+    # This will test the exclude in range option  
+    this1530114 = Matrix1530114("01530114-eng.csv", 1530114)
+    # to the actual upload
+    # note that an extremely large value is all that is left
+    this1530114.set_exrng(['v79874995','v79874998'])
+    print("*** exclusion list is ",this1530114.exrng)
+    this1530114.upload()
+    # will test accuracy of data uploaded
+    # note that this may need to be updated from time to time if the
+    # data itself changes
+    MYstore = HDFStore('Central_data.h5','r+')
+    themat7 = MYstore.select('Matrix1530114')
+    # check the very first observation of the first variable in the CSV file
+    theval = themat7.v79874999['2009']
+    print(theval)
+    assert math.isclose(theval,508),"v79874999 not loaded properly"
+    # check the last observation of the first variable
+    theval = themat7.v79874999['2014']
+    print(theval)
+    assert math.isclose(theval,536),"v79874999 not loaded properly"
+     # check the very first observation of the first variable in the CSV file
+    theval = themat7.v79875120['2009']
+    print(theval)
+    assert math.isclose(theval,637),"v79875120 2009 not loaded properly %f" %theval
+    # check the last observation of the first variable
+    theval = themat7.v79875120['2014']
+    print(theval)
+    assert math.isclose(theval,-1096),"v79875120 2014 not loaded properly %f" %theval     
     # then move back to directory
     # move up a directory
 
@@ -390,7 +540,7 @@ def printtest():
     print(MYstore)
     # themat = MYstore.select('Matrix2820001')
     # pprint.pprint(thevar)
-    themat2 = MYstore.select('Matrix3800085')
+    themat2 = MYstore.select('Matrix1530114')
     print(themat2)
     #therange = pandas.period_range('1989-1','1993-3',freq='Q-MAR')
     #thevar3 = Series(themat2.v62700456,index = therange)
