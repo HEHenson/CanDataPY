@@ -46,6 +46,7 @@ class StatCanMatrix(CansimPY.CansimPY):
         self.varsnotused = 0
         self.obcount = 0
         self.maxvars = maxvars
+        self.maxobs = 5000 #maximum number of observations in time series
         #maximum number of problems accept to use a timeseries
         self.maxprobs = maxprobs
         self.gen_dict = self.geo11_dict = None
@@ -197,9 +198,57 @@ class StatCanMatrix(CansimPY.CansimPY):
             return
         if mattype == 'obs_by_row':
             self.upload_obs_by_row(dateformat, vlist)
-
+        if mattype == 'by_row':
+            self.upload_by_row(dateformat, vlist)
         self.loadinh5()
         print("Out of %d variables %d were not loaded" %(self.varsinfile,self.varsnotused))
+    def upload_by_row(self, dateformat, vlist):
+        """ uploads the variable by row"""
+        # thetsvar holds the data being collected
+        thetsvar = timevar.CansimTS(self,dateformat)
+        # Will process use CSV reader in system
+        self.SCfilehandle.seek(0,0)
+        thereader = csv.reader(self.SCfilehandle)
+
+        # a feature of this file structure is that the date column and
+        # first ob are the same
+        self.datepos = self.obpos        
+        # start processing the file
+        self.obcount = 0
+        headerfound = False
+        headlines = 0
+        # need more formal limit
+        # note that last few lines are footnotes and should be ignored
+        for linelst in thereader:
+            # process lines until find header
+            if len(linelst) > self.namepos:
+                theobname = linelst[self.namepos]
+                headerfound = True
+            else:
+                continue
+            if theobname == "" : continue
+            if headerfound:
+                if theobname == "Vector":
+                    lastpos = len(linelst)
+                    thetsvar.setdate(linelst[self.datepos])
+                    continue
+            else:
+                headlines += 1
+                if headlines > 30 : return 'Ftype_Fail'
+                # need to find last time period
+                # need to validate this formulae
+                continue
+            self.resetTS(theobname, linelst, thetsvar,persistdate=True)
+            #all the data will be on the one line
+            #the first line will already be enter
+            thepos = self.obpos+1
+            while thepos < lastpos:
+                thetsvar.setvalue(linelst[thepos])
+                thepos += 1
+            thetsvar.save()
+            self.varsinfile += 1
+
+                
     def upload_obs_by_row(self, dateformat, vlist):
         """uploads the observations assuming one row per observation"""
         # thetsvar holds the data being collected
@@ -250,9 +299,9 @@ class StatCanMatrix(CansimPY.CansimPY):
         thetsvar.save()
 
         return self.varsinfile
-    def resetTS(self, thevar, linelst, thetsvar):
+    def resetTS(self, thevar, linelst, thetsvar,persistdate=False):
         """ reset the current time series"""
-        thetsvar.initvariable()
+        thetsvar.initvariable(persistdate)
         for colno in range(self.col_max):
             # identify the token to process
             thetoken = linelst[colno]
@@ -260,7 +309,7 @@ class StatCanMatrix(CansimPY.CansimPY):
             thefield = self.col_lst[colno]
             if thefield == 'None':
                 continue
-            if thefield == 'date':
+            if thefield == 'date' and persistdate == False:
                 thetsvar.setdate(thetoken)
                 continue
             if thefield == 'gender':
@@ -525,10 +574,39 @@ def unittest():
     # check the last observation of the first variable
     theval = themat7.v79875120['2014']
     print(theval)
-    assert math.isclose(theval,-1096),"v79875120 2014 not loaded properly %f" %theval     
+    assert math.isclose(theval,-1096),"v79875120 2014 not loaded properly %f" %theval    
+    
+    #Now will try a by row
+    class Matrix1530114Row(StatCanMatrix):
+        def __init__(self, thefile, thename="126"):
+            super(Matrix1530114Row, self).__init__(filename=thefile, maxvars=7000,matname=thename)
+            # these are valid keys
+            self.setcollist(['NA', 'NA', 'VName', 'NA', 'datum'])
+        def upload(self):
+            super(Matrix1530114Row, self).upload('by_row', 'AS-JAN', 'all')
+    # create an instance of it
+    this1530114 = Matrix1530114Row("1530114-eng-B.csv", 1530114)
+    # to the actual upload
+    this1530114.set_inclist(['v79874995','v79875120'])
+    print("*** inclist is ",this1530114.inclist)
+    this1530114.upload()
+    # will test accuracy of data uploaded
+    # note that this may need to be updated from time to time if the
+    # data itself changes
+    MYstore = HDFStore('Central_data.h5','r+')
+    themat8 = MYstore.select('Matrix1530114')
+    # check the very first observation of the first variable in the CSV file
+    theval = themat8.v79874995['2010']
+    print(theval)
+    assert math.isclose(theval,735016),"v79874995 not loaded properly by row"
+    # check the last observation of the first variable
+    theval = themat8.v79875120['2014']
+    print(theval)
+    assert math.isclose(theval,-1096),"v79875120 not loaded properly by row"
+    
+    
     # then move back to directory
     # move up a directory
-
     os.chdir(os.path.dirname(os.getcwd()))
     os.chdir('test2')
 
