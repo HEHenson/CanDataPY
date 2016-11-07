@@ -26,23 +26,28 @@ class CansimTS(object):
         """ ensures that all values are initialized first time"""
         self.initvariable()
         self.initobservation()
-    def  initvariable(self):
+    def  initvariable(self,persistdate=False):
         """these values may only need to be initialized once"""
-        self.styr = None  #first year
-        self.stmon = None #first month
-        self.stq = None #
-        self.vname = None
         self.usevar = True
         self.varprobs = 0
         self.obs = 0
         self.values = []
-    def  initobservation(self):
+        self.vname = None
+        if persistdate:
+            return
+        self.styr = None  #first year
+        self.stmon = None #first month
+        self.stq = None #
+
+    def  initobservation(self,persistdata=False):
         """init values that change with every time series"""
         self.curyr = None
         self.curmon = None
         self.curq = None
-        self.datstr = None
         self.gtag = 'UG'    #unknown gender
+        if persistdata :
+            return
+        self.datstr = None
     def setdate(self, thetoken):
         """ will split the token acc"""
         datetoklist = thetoken.split('/')
@@ -126,7 +131,6 @@ class CansimTS(object):
         stayin = False
         if self.thematrix.exrng is not None:
             if self.vname < self.thematrix.exrng[0] or self.vname > self.thematrix.exrng[1]:
-                print("scored a true on exrng with %s" %self.vname)
                 stayin = True
             if not stayin:
                 return
