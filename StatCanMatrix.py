@@ -14,6 +14,7 @@ import os
 import re
 import csv
 from pandas import Series, DataFrame, HDFStore
+
 import pandas
 import math
 import unittest.mock as mock
