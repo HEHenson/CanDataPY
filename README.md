@@ -8,3 +8,5 @@ This is an Alpha Version of a system under development.  It is intended to be a 
 - More options will be added to CSV import.  Currently only downloads by rows for monthly, quarterly and annual data are supported.  
   - Both weekly and government fiscal year will appear soon.
   - Time on vertical axis has just been added
+- Capacity to export data has just been added
+  - only R is currently supported
